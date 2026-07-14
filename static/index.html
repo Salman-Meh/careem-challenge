@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Review Assistant</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --text: #1a1d21;
+    --muted: #6b7280;
+    --border: #e2e5e9;
+    --accent: #2563eb;
+    --positive-bg: #ecfdf5;
+    --positive-border: #a7f3d0;
+    --positive-text: #065f46;
+    --improve-bg: #fffbeb;
+    --improve-border: #fde68a;
+    --improve-text: #92400e;
+    --error-bg: #fef2f2;
+    --error-border: #fecaca;
+    --error-text: #991b1b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --card: #1e2126;
+      --text: #e8eaed;
+      --muted: #9aa0a6;
+      --border: #2f333a;
+      --accent: #60a5fa;
+      --positive-bg: #062e21;
+      --positive-border: #0d5c3f;
+      --positive-text: #6ee7b7;
+      --improve-bg: #2a2210;
+      --improve-border: #6b5410;
+      --improve-text: #fcd34d;
+      --error-bg: #2a1414;
+      --error-border: #6b1d1d;
+      --error-text: #fca5a5;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 2.5rem 1rem;
+  }
+  main {
+    width: 100%;
+    max-width: 720px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+  }
+  p.subtitle {
+    color: var(--muted);
+    margin-top: 0;
+    margin-bottom: 1.5rem;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  textarea {
+    width: 100%;
+    min-height: 220px;
+    resize: vertical;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    padding: 0.75rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.5rem;
+  }
+  .word-counter {
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .word-counter.over {
+    color: var(--error-text);
+    font-weight: 600;
+  }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  #results {
+    margin-top: 1.5rem;
+    display: none;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .result-box {
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+    border: 1px solid;
+  }
+  .result-box.positive {
+    background: var(--positive-bg);
+    border-color: var(--positive-border);
+    color: var(--positive-text);
+  }
+  .result-box.improvements {
+    background: var(--improve-bg);
+    border-color: var(--improve-border);
+    color: var(--improve-text);
+  }
+  .result-box.error {
+    background: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error-text);
+  }
+  .result-box h3 {
+    margin: 0 0 0.4rem 0;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .result-box ol, .result-box p {
+    margin: 0;
+    padding-left: 1.1rem;
+  }
+  .result-box li {
+    margin-bottom: 0.3rem;
+  }
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Code Review Assistant</h1>
+  <p class="subtitle">Paste a short code snippet and get one positive note plus up to three improvements.</p>
+
+  <div class="card">
+    <textarea id="code-input" placeholder="Paste your code snippet here..."></textarea>
+    <div class="row">
+      <span id="word-counter" class="word-counter">0 / ... words</span>
+      <button id="submit-btn" type="button" disabled>Review Code</button>
+    </div>
+  </div>
+
+  <div id="results"></div>
+</main>
+
+<script>
+  const textarea = document.getElementById('code-input');
+  const counterEl = document.getElementById('word-counter');
+  const submitBtn = document.getElementById('submit-btn');
+  const resultsEl = document.getElementById('results');
+
+  let wordLimit = null;
+
+  function countWords(text) {
+    const trimmed = text.trim();
+    if (!trimmed) return 0;
+    return trimmed.split(/\s+/).length;
+  }
+
+  function updateCounterAndButton() {
+    const count = countWords(textarea.value);
+    const limitLabel = wordLimit === null ? '...' : wordLimit;
+    counterEl.textContent = `${count} / ${limitLabel} words`;
+
+    const overLimit = wordLimit !== null && count > wordLimit;
+    counterEl.classList.toggle('over', overLimit);
+
+    const isEmpty = count === 0;
+    submitBtn.disabled = isEmpty || overLimit || wordLimit === null;
+  }
+
+  async function loadConfig() {
+    try {
+      const res = await fetch('/config');
+      const data = await res.json();
+      wordLimit = data.word_limit;
+    } catch (e) {
+      wordLimit = null;
+      counterEl.textContent = 'Could not load word limit from server.';
+      counterEl.classList.add('over');
+    }
+    updateCounterAndButton();
+  }
+
+  function renderLoading() {
+    resultsEl.style.display = 'flex';
+    resultsEl.innerHTML = `<div class="result-box"><span class="spinner" style="border-top-color:var(--accent); border-color: rgba(0,0,0,0.15);"></span>Reviewing your code...</div>`;
+  }
+
+  function renderError(message) {
+    resultsEl.style.display = 'flex';
+    resultsEl.innerHTML = `<div class="result-box error"><h3>Something went wrong</h3><p>${escapeHtml(message)}</p></div>`;
+  }
+
+  function renderReview(data) {
+    resultsEl.style.display = 'flex';
+    let html = `<div class="result-box positive"><h3>What's Good</h3><p>${escapeHtml(data.positive_note || 'Looks fine overall.')}</p></div>`;
+
+    if (data.improvements && data.improvements.length > 0) {
+      const items = data.improvements.map(item => `<li>${escapeHtml(item)}</li>`).join('');
+      html += `<div class="result-box improvements"><h3>Improvements</h3><ol>${items}</ol></div>`;
+    } else {
+      html += `<div class="result-box improvements"><h3>Improvements</h3><p>No improvements needed - this snippet looks solid!</p></div>`;
+    }
+
+    resultsEl.innerHTML = html;
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  async function submitReview() {
+    const code = textarea.value;
+    submitBtn.disabled = true;
+    renderLoading();
+
+    try {
+      const res = await fetch('/review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        renderError(data.error || 'The server returned an unexpected error.');
+      } else {
+        renderReview(data);
+      }
+    } catch (e) {
+      renderError('Could not reach the backend. Is it running at this address?');
+    } finally {
+      updateCounterAndButton();
+    }
+  }
+
+  textarea.addEventListener('input', updateCounterAndButton);
+  submitBtn.addEventListener('click', submitReview);
+
+  loadConfig();
+</script>
+</body>
+</html>
