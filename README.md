@@ -20,19 +20,24 @@ The frontend is a single static HTML page; the backend is a small Flask API that
    pip install -r requirements.txt
    ```
 
-2. Set your Gemini API key as an environment variable:
+   If `pip` isn't found (common on macOS with Homebrew Python), use `pip3` instead:
 
-   macOS / Linux:
    ```bash
-   export GEMINI_API_KEY=your_key_here
+   pip3 install -r requirements.txt
    ```
 
-   Windows (Command Prompt):
-   ```cmd
-   set GEMINI_API_KEY=your_key_here
+2. Set your Gemini API key:
+
+   Copy `.env.example` to `.env` and fill in your key:
+   ```bash
+   cp .env.example .env
    ```
 
-   (`.env.example` shows the variable name expected — this project reads it directly from the environment, so make sure it's exported in the same terminal session before starting the server.)
+   ```
+   GEMINI_API_KEY=your_key_here
+   ```
+
+   (`.env` is gitignored — the app loads it automatically on startup via `python-dotenv`.)
 
 3. Start the server:
 

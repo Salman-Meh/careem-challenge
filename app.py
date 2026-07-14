@@ -2,9 +2,12 @@ import json
 import os
 import re
 
+from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from google import genai
 from google.genai import types
+
+load_dotenv()
 
 WORD_LIMIT = 200
 MODEL_NAME = "gemini-flash-latest"
