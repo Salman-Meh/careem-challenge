@@ -14,13 +14,17 @@ The frontend is a single static HTML page; the backend is a small Flask API that
 
 ## Setup
 
-1. Install dependencies:
+1. Create a virtual environment and install dependencies:
 
    ```bash
+   python3 -m venv venv
+   source venv/bin/activate
    pip install -r requirements.txt
    ```
 
-   If `pip` isn't found (common on macOS with Homebrew Python), use `pip3` instead:
+   (On macOS with Homebrew Python you'll get an `externally-managed-environment` error if you skip the venv — activating it first avoids that. Remember to `source venv/bin/activate` again in any new terminal session before running the app.)
+
+   If `pip` isn't found even inside the venv, use `pip3` instead:
 
    ```bash
    pip3 install -r requirements.txt
@@ -28,7 +32,12 @@ The frontend is a single static HTML page; the backend is a small Flask API that
 
 2. Set your Gemini API key:
 
-   Copy `.env.example` to `.env` and fill in your key:
+   Generate a free key:
+   - Go to [Google AI Studio](https://aistudio.google.com/apikey)
+   - Sign in with your Google account
+   - Click **Create API key** (no credit card required) and copy the generated key
+
+   Copy `.env.example` to `.env` and paste your key in:
    ```bash
    cp .env.example .env
    ```

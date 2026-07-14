@@ -153,8 +153,8 @@
     display: inline-block;
     width: 14px;
     height: 14px;
-    border: 2px solid rgba(255,255,255,0.4);
-    border-top-color: white;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
     margin-right: 0.5rem;
@@ -169,7 +169,10 @@
   <p class="subtitle">Paste a short code snippet and get one positive note plus up to three improvements.</p>
 
   <div class="card">
-    <textarea id="code-input" placeholder="Paste your code snippet here..."></textarea>
+    <textarea id="code-input" placeholder="Paste your code snippet here...">def add(a, b):
+    return a+b
+
+print(add(2, 3))</textarea>
     <div class="row">
       <span id="word-counter" class="word-counter">0 / ... words</span>
       <button id="submit-btn" type="button" disabled>Review Code</button>
@@ -218,17 +221,37 @@
     updateCounterAndButton();
   }
 
+  let loadingDotsInterval = null;
+
+  function stopLoadingDots() {
+    if (loadingDotsInterval) {
+      clearInterval(loadingDotsInterval);
+      loadingDotsInterval = null;
+    }
+  }
+
   function renderLoading() {
+    stopLoadingDots();
     resultsEl.style.display = 'flex';
-    resultsEl.innerHTML = `<div class="result-box"><span class="spinner" style="border-top-color:var(--accent); border-color: rgba(0,0,0,0.15);"></span>Reviewing your code...</div>`;
+    resultsEl.innerHTML = `<div class="result-box"><span class="spinner"></span>Reviewing your code<span id="loading-dots">.</span></div>`;
+
+    const dotsEl = document.getElementById('loading-dots');
+    const dotStates = ['.', '..', '...'];
+    let dotIndex = 0;
+    loadingDotsInterval = setInterval(() => {
+      dotIndex = (dotIndex + 1) % dotStates.length;
+      dotsEl.textContent = dotStates[dotIndex];
+    }, 500);
   }
 
   function renderError(message) {
+    stopLoadingDots();
     resultsEl.style.display = 'flex';
     resultsEl.innerHTML = `<div class="result-box error"><h3>Something went wrong</h3><p>${escapeHtml(message)}</p></div>`;
   }
 
   function renderReview(data) {
+    stopLoadingDots();
     resultsEl.style.display = 'flex';
     let html = `<div class="result-box positive"><h3>What's Good</h3><p>${escapeHtml(data.positive_note || 'Looks fine overall.')}</p></div>`;
 

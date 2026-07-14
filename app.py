@@ -1,13 +1,19 @@
 import json
+import logging
 import os
 import re
 
+import flask.cli
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 load_dotenv()
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger("code-review-assistant")
 
 WORD_LIMIT = 200
 MODEL_NAME = "gemini-flash-latest"
@@ -76,15 +82,20 @@ def review():
     code = (data.get("code") or "").strip()
 
     if not code:
+        logger.warning("Rejected request: empty code snippet")
         return jsonify({"error": "Please paste a code snippet before submitting."}), 400
 
     word_count = len(code.split())
+    logger.info("Received review request (%d words)", word_count)
+
     if word_count > WORD_LIMIT:
+        logger.warning("Rejected request: %d words exceeds limit of %d", word_count, WORD_LIMIT)
         return jsonify({
             "error": f"Snippet is {word_count} words, which exceeds the {WORD_LIMIT}-word limit."
         }), 400
 
     try:
+        logger.info("Calling Gemini model %s...", MODEL_NAME)
         client = get_client()
         response = client.models.generate_content(
             model=MODEL_NAME,
@@ -93,13 +104,28 @@ def review():
         )
         result = extract_json(response.text)
     except RuntimeError as exc:
+        logger.error("Configuration error: %s", exc)
         return jsonify({"error": str(exc)}), 500
+    except genai_errors.APIError as exc:
+        logger.exception("Gemini API error (code %s)", exc.code)
+        if exc.code == 503:
+            message = "The Gemini API is currently overloaded. Please try again in a moment."
+        elif exc.code == 429:
+            message = "Rate limit reached for the Gemini API. Please wait a moment and try again."
+        elif exc.code in (401, 403):
+            message = "The Gemini API key is invalid or missing permissions."
+        else:
+            message = exc.message or "The review service returned an unexpected error."
+        return jsonify({"error": message}), 502
     except Exception:
+        logger.exception("Gemini request failed")
         return jsonify({"error": "The review service is unavailable right now. Please try again."}), 502
 
     improvements = result.get("improvements") or []
     if not isinstance(improvements, list):
         improvements = []
+
+    logger.info("Review complete: %d improvement(s) returned", len(improvements[:3]))
 
     return jsonify({
         "language": result.get("language", ""),
@@ -109,4 +135,9 @@ def review():
 
 
 if __name__ == "__main__":
+    logging.getLogger("werkzeug").setLevel(logging.ERROR)
+    flask.cli.show_server_banner = lambda *args, **kwargs: None
+    if os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        logger.info("Serving Flask app 'app' (debug mode: on)")
+        logger.info("Running on http://127.0.0.1:8000")
     app.run(port=8000, debug=True)
