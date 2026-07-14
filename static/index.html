@@ -169,10 +169,16 @@
   <p class="subtitle">Paste a short code snippet and get one positive note plus up to three improvements.</p>
 
   <div class="card">
-    <textarea id="code-input" placeholder="Paste your code snippet here...">def add(a, b):
-    return a+b
-
-print(add(2, 3))</textarea>
+    <textarea id="code-input" placeholder="Paste your code snippet here...">def process_items(items, cache={}):
+    result = []
+    for i in range(len(items)):
+        try:
+            value = 100 / items[i]
+            cache[i] = value
+            result.append(value)
+        except:
+            pass
+    return result
     <div class="row">
       <span id="word-counter" class="word-counter">0 / ... words</span>
       <button id="submit-btn" type="button" disabled>Review Code</button>

@@ -4,6 +4,7 @@ import os
 import re
 
 import flask.cli
+import httpx
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request
 from google import genai
@@ -16,7 +17,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger("code-review-assistant")
 
 WORD_LIMIT = 200
-MODEL_NAME = "gemini-flash-latest"
+MODEL_NAME = "gemini-flash-lite-latest"
+REQUEST_TIMEOUT_MS = 10_000
 
 REVIEW_PROMPT = """You are an expert code reviewer. You will be given a short code snippet. Analyze it and return ONLY a JSON object (no markdown, no code fences) with exactly this shape:
 
@@ -100,12 +102,18 @@ def review():
         response = client.models.generate_content(
             model=MODEL_NAME,
             contents=REVIEW_PROMPT.format(code=code),
-            config=types.GenerateContentConfig(response_mime_type="application/json"),
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                http_options=types.HttpOptions(timeout=REQUEST_TIMEOUT_MS),
+            ),
         )
         result = extract_json(response.text)
     except RuntimeError as exc:
         logger.error("Configuration error: %s", exc)
         return jsonify({"error": str(exc)}), 500
+    except httpx.TimeoutException:
+        logger.error("Gemini request timed out after %d ms", REQUEST_TIMEOUT_MS)
+        return jsonify({"error": "The review took too long and was cancelled. Please try again."}), 504
     except genai_errors.APIError as exc:
         logger.exception("Gemini API error (code %s)", exc.code)
         if exc.code == 503:
