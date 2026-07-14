@@ -62,6 +62,8 @@ That's it — the same server serves both the frontend and the API, so there's n
 
 Paste a code snippet into the textarea and click **Review Code**. The word counter shows the current word limit (default 200 words, pulled from the backend) and the button disables automatically if you go over it or leave the box empty.
 
+You'll get one positive note plus up to three improvements — fewer if the snippet is already solid (zero improvements if nothing meaningful needs to change).
+
 ## Configuration
 
 - **Word limit**: change `WORD_LIMIT` in `app.py`. The frontend reads this value from `GET /config` automatically, so there's only one place to edit.
